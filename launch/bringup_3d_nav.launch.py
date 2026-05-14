@@ -2,9 +2,11 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
@@ -13,6 +15,7 @@ def generate_launch_description():
     map_file = LaunchConfiguration('map')
     params_file = LaunchConfiguration('params_file')
     use_sim_time = LaunchConfiguration('use_sim_time')
+    use_joint_state_publisher = LaunchConfiguration('use_joint_state_publisher')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -22,15 +25,21 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'params_file',
-            default_value=os.path.join(pkg_share, 'config', 'nav2_params.yaml'),
-            description='Full path to Nav2 params file'
+            default_value=os.path.join(pkg_share, 'config', 'nav2_params_3d.yaml'),
+            description='Full path to Nav2 3D params file'
         ),
         DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',
             description='Use simulation clock if true'
         ),
+        DeclareLaunchArgument(
+            'use_joint_state_publisher',
+            default_value='true',
+            description='Set false when the arm driver already publishes /joint_states'
+        ),
 
+        # LiDAR frame: MID-360 mount pose (same as original bringup)
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
@@ -49,22 +58,17 @@ def generate_launch_description():
             ]
         ),
 
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='tf_base_to_lidar_2',
-            output='screen',
-            arguments=[
-                '--x', '0.15',
-                '--y', '-0.08',
-                '--z', '0.25',
-                '--qx', '0',
-                '--qy', '0',
-                '--qz', '0',
-                '--qw', '1',
-                '--frame-id', 'base_link',
-                '--child-frame-id', 'lidar_base_link2',
-            ]
+        # robot_state_publisher + joint_state_publisher for the arm chain
+        # (publishes base_link → ... → camera_link_d435i dynamically)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                FindPackageShare('bartbot_description'),
+                '/launch/bartbot_description.launch.py'
+            ]),
+            launch_arguments={
+                'gui_rviz': 'false',
+                'use_joint_state_publisher': use_joint_state_publisher,
+            }.items()
         ),
 
         Node(
@@ -87,47 +91,14 @@ def generate_launch_description():
         ),
 
         Node(
-            package='pointcloud_to_laserscan',
-            executable='pointcloud_to_laserscan_node',
-            name='pointcloud_to_laserscan',
-            output='screen',
-            remappings=[
-                ('cloud_in', '/dlio/odom_node/pointcloud/deskewed'),
-                ('scan', '/scan'),
-            ],
-            parameters=[{
-                'target_frame': 'lidar_base_link2',
-                'transform_tolerance': 0.1,
-                'min_height': -0.1,
-                'max_height': 0.1,
-                'angle_min': -3.14159,
-                'angle_max': 3.14159,
-                'angle_increment': 0.0087,
-                'scan_time': 0.1,
-                'range_min': 0.4,
-                'range_max': 10.0,
-                'use_inf': True,
-                'inf_epsilon': 1.0,
-            }]
-        ),
-
-        Node(
             package='nav2_map_server',
             executable='map_server',
             name='map_server',
             output='screen',
             parameters=[{
                 'use_sim_time': use_sim_time,
-                'yaml_filename': map_file
+                'yaml_filename': map_file,
             }]
-        ),
-
-        Node(
-            package='nav2_amcl',
-            executable='amcl',
-            name='amcl',
-            output='screen',
-            parameters=[params_file]
         ),
 
         Node(
@@ -180,12 +151,11 @@ def generate_launch_description():
                 'autostart': True,
                 'node_names': [
                     'map_server',
-                    'amcl',
                     'planner_server',
                     'controller_server',
                     'behavior_server',
                     'bt_navigator',
-                    'waypoint_follower'
+                    'waypoint_follower',
                 ]
             }]
         ),

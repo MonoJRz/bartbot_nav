@@ -24,10 +24,8 @@ setup(
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={
-    'console_scripts': [
-        'cmd_vel_to_platform_twist = bartbot_nav.cmd_vel_to_platform_twist:main',
-        'nav2_cmd_vel_filter = bartbot_nav.nav2_cmd_vel_filter:main',
-        'cmd_vel_mux_simple = bartbot_nav.cmd_vel_mux_simple:main'
+        'console_scripts': [
+            'cmd_vel_to_platform_twist = bartbot_nav.cmd_vel_to_platform_twist:main',
         ],
     },
 )
