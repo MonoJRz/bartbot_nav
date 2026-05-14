@@ -65,7 +65,7 @@ def generate_launch_description():
                 '--qz', '0',
                 '--qw', '1',
                 '--frame-id', 'base_link',
-                '--child-frame-id', 'lidar_base_link2',
+                '--child-frame-id', 'laser_projection_frame',
             ]
         ),
 
@@ -166,7 +166,7 @@ def generate_launch_description():
                 ('scan', '/scan'),
             ],
             parameters=[{
-                'target_frame': 'lidar_base_link2',
+                'target_frame': 'laser_projection_frame',
                 'transform_tolerance': 0.1,
                 'min_height': -0.1,
                 'max_height': 0.1,
